@@ -6,15 +6,28 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  updateProfile,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { toast } from 'sonner';
+import PasswordInput from '@/components/PasswordInput';
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const validatePassword = (pwd: string): string | null => {
+    if (pwd.length < 8) return 'Password must be at least 8 characters long';
+    if (!/[A-Z]/.test(pwd)) return 'Password must contain at least one uppercase letter';
+    if (!/[0-9]/.test(pwd)) return 'Password must contain at least one number';
+    return null;
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,8 +37,53 @@ export default function AuthForm() {
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
+        toast.success('Welcome back!');
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        // Signup validation
+        if (!username.trim()) {
+          setError('Username is required');
+          setLoading(false);
+          return;
+        }
+        if (username.trim().length < 3) {
+          setError('Username must be at least 3 characters');
+          setLoading(false);
+          return;
+        }
+        const pwdError = validatePassword(password);
+        if (pwdError) {
+          setError(pwdError);
+          setLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('Passwords do not match');
+          setLoading(false);
+          return;
+        }
+
+        // Check if username already taken
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('username', '==', username.trim().toLowerCase()));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          setError('Username is already taken');
+          setLoading(false);
+          return;
+        }
+
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(cred.user, { displayName: username.trim() });
+
+        // Save user profile to Firestore
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          username: username.trim().toLowerCase(),
+          displayUsername: username.trim(),
+          email: email.toLowerCase(),
+          createdAt: Date.now(),
+        });
+
+        toast.success('Account created successfully!');
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
@@ -40,7 +98,22 @@ export default function AuthForm() {
 
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const cred = await signInWithPopup(auth, provider);
+
+      // Create profile if it doesn't exist
+      const { doc: docRef, getDoc } = await import('firebase/firestore');
+      const userDoc = await getDoc(docRef(db, 'users', cred.user.uid));
+      if (!userDoc.exists()) {
+        const googleName = cred.user.displayName || cred.user.email?.split('@')[0] || 'user';
+        await setDoc(docRef(db, 'users', cred.user.uid), {
+          username: googleName.toLowerCase().replace(/\s+/g, ''),
+          displayUsername: googleName,
+          email: cred.user.email?.toLowerCase() || '',
+          createdAt: Date.now(),
+        });
+      }
+
+      toast.success('Welcome!');
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {
@@ -51,10 +124,10 @@ export default function AuthForm() {
   return (
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
-        <h2 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white">
+        <h2 className="text-4xl font-bold tracking-tight text-foreground">
           {isLogin ? 'Welcome back' : 'Create account'}
         </h2>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-sm text-muted-foreground">
           {isLogin ? 'Sign in to play Kakuro' : 'Sign up to try out competitive Kakuro'}
         </p>
       </div>
@@ -67,8 +140,25 @@ export default function AuthForm() {
         )}
 
         <form onSubmit={handleEmailAuth} className="space-y-5">
+          {!isLogin && (
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-foreground">
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                required={!isLogin}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground placeholder-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="your username"
+              />
+            </div>
+          )}
+
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label htmlFor="email" className="block text-sm font-medium text-foreground">
               Email address
             </label>
             <input
@@ -77,30 +167,42 @@ export default function AuthForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus:border-zinc-500 dark:focus:ring-zinc-500"
+              className="mt-1 block w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground placeholder-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
               placeholder="your email here"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
+            <PasswordInput
+              label="Password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus:border-zinc-500 dark:focus:ring-zinc-500"
+              onChange={(e) => setPassword(e)}
               placeholder="••••••••"
+              autoComplete={isLogin ? 'current-password' : 'new-password'}
             />
+            {!isLogin && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Min 8 characters, at least one uppercase letter and one number
+              </p>
+            )}
           </div>
+
+          {!isLogin && (
+            <div>
+              <PasswordInput
+                label="Re-enter Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e)}
+                placeholder="••••••••"
+                autoComplete="new-password"
+              />
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-zinc-900 px-4 py-3 font-semibold text-white transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 dark:focus:ring-white"
+            className="w-full rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
           >
             {loading ? 'Loading...' : isLogin ? 'Sign in' : 'Sign up'}
           </button>
@@ -108,10 +210,10 @@ export default function AuthForm() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-zinc-300 dark:border-zinc-700" />
+            <div className="w-full border-t border-border" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-2 text-zinc-500 dark:bg-black dark:text-zinc-400">
+            <span className="bg-background px-2 text-muted-foreground">
               Or continue with
             </span>
           </div>
@@ -120,7 +222,7 @@ export default function AuthForm() {
         <button
           onClick={handleGoogleAuth}
           disabled={loading}
-          className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800"
+          className="w-full rounded-lg border border-input bg-background px-4 py-3 font-semibold text-foreground transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
         >
           <div className="flex items-center justify-center gap-3">
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -147,10 +249,13 @@ export default function AuthForm() {
 
         <div className="text-center">
           <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-sm font-medium text-zinc-900 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+            }}
+            className="text-sm font-medium text-foreground hover:text-muted-foreground"
           >
-            {isLogin ? "Sign up if you don't have an account" : 'Sign in'}
+            {isLogin ? "Sign up if you don't have an account" : 'Already have an account? Sign in'}
           </button>
         </div>
       </div>
