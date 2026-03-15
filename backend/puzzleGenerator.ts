@@ -34,7 +34,7 @@ function getDifficultySettings(difficulty: Difficulty): DifficultySettings {
         randomThreshold: 0.35, // more clue cells → simpler layout
         maxGroupSize: 3,
         hintCount: 0,
-        timeLimitSeconds: 120,
+        timeLimitSeconds: 180,
       };
     case 'medium':
       return {
@@ -42,7 +42,7 @@ function getDifficultySettings(difficulty: Difficulty): DifficultySettings {
         randomThreshold: 0.45,
         maxGroupSize: 5,
         hintCount: 0,
-        timeLimitSeconds: 300,
+        timeLimitSeconds: 450,
       };
     case 'hard':
       return {
