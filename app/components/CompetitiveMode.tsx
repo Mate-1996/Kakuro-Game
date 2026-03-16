@@ -30,9 +30,20 @@ interface MatchData {
   player1Time: number | null;
   player2Time: number | null;
   winner: string | null;
-  status: 'active' | 'completed';
+  status: MatchStatus;
   timeLimit: number;
   createdAt: number;
+}
+
+enum MatchStatus {
+  active = 'active',
+  completed = 'completed',
+}
+
+enum InviteStatus {
+  pending = 'pending',
+  accepted = 'accepted',
+  declined = 'declined'
 }
 
 interface MatchInvite {
@@ -41,7 +52,7 @@ interface MatchInvite {
   fromUsername: string;
   toUid: string;
   toUsername: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: InviteStatus;
   matchId?: string;
   createdAt: number;
 }
@@ -187,15 +198,26 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
     setSearchingText('Finding opponent...');
 
     try {
-      // Check if anyone is waiting in the queue
+      // Check if anyone is waiting in the queue (within the last 2 minutes)
+      const now = Date.now();
+      const STALE_TIMEOUT = 2 * 60 * 1000; // 2 minutes
       const queueRef = collection(db, 'matchQueue');
-      const q = query(queueRef, where('uid', '!=', user.uid), orderBy('createdAt'), limit(1));
+      const q = query(queueRef, where('createdAt', '>=', now - STALE_TIMEOUT), orderBy('createdAt'), limit(10));
       const snapshot = await getDocs(q);
 
-      if (!snapshot.empty) {
+      let opponent = null;
+      let opData = null;
+
+      for (const d of snapshot.docs) {
+        if (d.data().uid !== user.uid) {
+          opponent = d;
+          opData = d.data();
+          break;
+        }
+      }
+
+      if (opponent && opData) {
         // Found an opponent - create the match
-        const opponent = snapshot.docs[0];
-        const opData = opponent.data();
 
         setSearchingText(`Matched with ${opData.username}!`);
 
@@ -234,10 +256,11 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
       } else {
         // No one waiting - add ourselves to queue
         setSearchingText('Waiting for an opponent...');
+        const queueJoinTime = Date.now();
         const queueDoc = await addDoc(collection(db, 'matchQueue'), {
           uid: user.uid,
           username: userProfile.displayUsername || userProfile.username,
-          createdAt: Date.now(),
+          createdAt: queueJoinTime,
         });
         queueDocRef.current = queueDoc.id;
 
@@ -248,28 +271,37 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
           where('player1Uid', '==', user.uid),
           where('status', '==', 'active'),
           orderBy('createdAt', 'desc'),
-          limit(1)
+          limit(5)
         );
 
         const matchUnsub = onSnapshot(matchQuery, (snap) => {
           if (!snap.empty) {
-            const matchData = { id: snap.docs[0].id, ...snap.docs[0].data() } as MatchData;
-            const puzzle = JSON.parse(matchData.puzzleData) as KakuroGrid;
-            setMatchPuzzle(puzzle);
-            setCurrentMatch(matchData);
-            gameStartTimeRef.current = Date.now();
-            hasUsedCheckRef.current = false;
+            // Find a newly created match that started AFTER we joined the queue
+            // This prevents us from accidentally joining an old zombie/ghost match
+            const validDoc = snap.docs.find(d => {
+              const data = d.data();
+              return data.createdAt && data.createdAt >= queueJoinTime;
+            });
 
-            // Remove ourselves from queue
-            if (queueDocRef.current) {
-              deleteDoc(doc(db, 'matchQueue', queueDocRef.current)).catch(() => {});
-              queueDocRef.current = null;
+            if (validDoc) {
+              const matchData = { id: validDoc.id, ...validDoc.data() } as MatchData;
+              const puzzle = JSON.parse(matchData.puzzleData) as KakuroGrid;
+              setMatchPuzzle(puzzle);
+              setCurrentMatch(matchData);
+              gameStartTimeRef.current = Date.now();
+              hasUsedCheckRef.current = false;
+
+              // Remove ourselves from queue
+              if (queueDocRef.current) {
+                deleteDoc(doc(db, 'matchQueue', queueDocRef.current)).catch(() => {});
+                queueDocRef.current = null;
+              }
+
+              listenToMatch(matchData.id);
+              toast.success(`Match found! ${matchData.difficulty} ${matchData.gridSize}×${matchData.gridSize}`);
+              matchUnsub();
+              setTimeout(() => setView('match'), 1500);
             }
-
-            listenToMatch(matchData.id);
-            toast.success(`Match found! ${matchData.difficulty} ${matchData.gridSize}×${matchData.gridSize}`);
-            matchUnsub();
-            setTimeout(() => setView('match'), 1500);
           }
         });
 
