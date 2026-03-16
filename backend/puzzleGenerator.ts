@@ -34,7 +34,7 @@ function getDifficultySettings(difficulty: Difficulty): DifficultySettings {
         randomThreshold: 0.35, // more clue cells → simpler layout
         maxGroupSize: 3,
         hintCount: 0,
-        timeLimitSeconds: 180,
+        timeLimitSeconds: 240,
       };
     case 'medium':
       return {
@@ -42,7 +42,7 @@ function getDifficultySettings(difficulty: Difficulty): DifficultySettings {
         randomThreshold: 0.45,
         maxGroupSize: 5,
         hintCount: 0,
-        timeLimitSeconds: 450,
+        timeLimitSeconds: 500,
       };
     case 'hard':
       return {
@@ -50,7 +50,7 @@ function getDifficultySettings(difficulty: Difficulty): DifficultySettings {
         randomThreshold: 0.55, // fewer clue cells → longer runs → harder
         maxGroupSize: 7,
         hintCount: 0,
-        timeLimitSeconds: 600,
+        timeLimitSeconds: 700,
       };
   }
 }
