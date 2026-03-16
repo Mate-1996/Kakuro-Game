@@ -30,9 +30,20 @@ interface MatchData {
   player1Time: number | null;
   player2Time: number | null;
   winner: string | null;
-  status: 'active' | 'completed';
+  status: MatchStatus;
   timeLimit: number;
   createdAt: number;
+}
+
+enum MatchStatus {
+  active = 'active',
+  completed = 'completed',
+}
+
+enum InviteStatus {
+  pending = 'pending',
+  accepted = 'accepted',
+  declined = 'declined'
 }
 
 interface MatchInvite {
@@ -41,7 +52,7 @@ interface MatchInvite {
   fromUsername: string;
   toUid: string;
   toUsername: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: InviteStatus;
   matchId?: string;
   createdAt: number;
 }
