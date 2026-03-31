@@ -6,12 +6,13 @@ import { auth } from '@/lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import KakuroGame from './Kakurogame';
 import CompetitiveMode from './CompetitiveMode';
+import Quickuro from './Quickuro';
 import FriendsList from './FriendsList';
 import Achievements from './Achievements';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 
-type DashboardView = 'home' | 'normal' | 'competitive' | 'friends';
+type DashboardView = 'home' | 'normal' | 'competitive' | 'friends' | 'quickuro';
 type SidebarSection = 'stats' | 'achievements' | 'friends';
 
 export default function Dashboard() {
@@ -45,6 +46,10 @@ export default function Dashboard() {
 
   if (view === 'competitive') {
     return <CompetitiveMode onBack={() => setView('home')} />;
+  }
+
+  if (view === 'quickuro') {
+    return <Quickuro onBack={() => setView('home')} />;
   }
 
   const displayName = isGuest
@@ -243,7 +248,7 @@ export default function Dashboard() {
           ) : (
             <button
               onClick={() => setView('competitive')}
-              className="group rounded-xl border-2 border-orange-500/50 bg-card p-8 text-left transition-all hover:border-orange-500 hover:shadow-lg hover:shadow-orange-500/10"
+              className="group rounded-xl border-2 border-orange-500/50 bg-card p-8 text-left transition-all hover:border-orange-500 hover:shadow-lg hover:shadow-orange-500"
             >
               <div className="flex items-center gap-4">
                 <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-orange-500/10 text-3xl transition-transform group-hover:scale-110">
@@ -259,6 +264,25 @@ export default function Dashboard() {
               </p>
             </button>
           )}
+
+          {/* Normal Mode Card */}
+          <button
+            onClick={() => setView('quickuro')}
+            className="group rounded-xl border-2 border-violet-800 bg-card p-8 text-left transition-all hover:border-violet-700 hover:shadow-xl hover:shadow-violet-600/50"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-3xl transition-transform group-hover:scale-110">
+                ⚡
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Quickuro™️</h3>
+                <p className="text-sm text-muted-foreground text-violet-500">Play against a set time.</p>
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Choose your own grid size, difficulty, and time. Race against time!
+            </p>
+          </button>
         </div>
 
         {/* Mobile-only sections (shown below on small screens) */}

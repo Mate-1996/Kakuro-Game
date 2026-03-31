@@ -74,6 +74,7 @@ function createMatchPuzzle(): { puzzle: KakuroGrid; difficulty: Difficulty; grid
   const gridSize = randomChoice([6, 8, 10]) as 6 | 8 | 10;
   const puzzle = generateKakuroPuzzle(gridSize, difficulty);
   const timeLimit = getTimeLimitForDifficulty(difficulty, gridSize);
+
   return { puzzle, difficulty, gridSize, timeLimit };
 }
 
@@ -85,6 +86,7 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [pendingInvites, setPendingInvites] = useState<MatchInvite[]>([]);
   const [searchingText, setSearchingText] = useState('Finding opponent...');
+
   const [matchResult, setMatchResult] = useState<{
     won: boolean;
     opponentName: string;
@@ -93,6 +95,7 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
     difficulty: Difficulty;
     gridSize: number;
   } | null>(null);
+     
   const queueDocRef = useRef<string | null>(null);
   const matchUnsubRef = useRef<(() => void) | null>(null);
   const gameStartTimeRef = useRef<number>(0);
@@ -277,7 +280,7 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
         const matchUnsub = onSnapshot(matchQuery, (snap) => {
           if (!snap.empty) {
             // Find a newly created match that started AFTER we joined the queue
-            // This prevents us from accidentally joining an old zombie/ghost match
+            // This prevents us from accidentally joining an old match
             const validDoc = snap.docs.find(d => {
               const data = d.data();
               return data.createdAt && data.createdAt >= queueJoinTime;
@@ -288,7 +291,7 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
               const puzzle = JSON.parse(matchData.puzzleData) as KakuroGrid;
               setMatchPuzzle(puzzle);
               setCurrentMatch(matchData);
-              gameStartTimeRef.current = Date.now();
+              gameStartTimeRef.current = Date.now(); 
               hasUsedCheckRef.current = false;
 
               // Remove ourselves from queue
@@ -511,9 +514,6 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
             ← Back
           </button>
           <h1 className="text-3xl font-bold text-foreground">Competitive Mode</h1>
-          <span className="rounded-md bg-orange-100 px-2 py-1 text-sm font-semibold text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
-            COMPETITIVE
-          </span>
         </div>
 
         <div className="rounded-xl border border-border bg-card p-8 text-center space-y-6">
