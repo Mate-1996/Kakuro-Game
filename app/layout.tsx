@@ -30,7 +30,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem={false} themes={["light", "dark", "purple", "blue", "redWhite", "green"]}>
           <AuthProvider>
             {children}
             <Toaster position="top-center" richColors />
