@@ -15,37 +15,55 @@ export interface UserProfile {
 export interface UserStats {
   gamesPlayed: number;
   gamesWon: number;
+  perfectGames: number;
+  achievements: string[];
+  bestTime: number | null;
+
   competitiveWins: number;
   competitiveLosses: number;
   competitiveStreak: number;
   bestCompStreak: number;
-  bestTime: number | null;
+
+  quickuroWins: number;
+  quickuroLosses: number;
+  quickuroBestTime: number | null;
+  quickuroBestStreak: number;
+  quickuroCurrentStreak: number;
+
   easyCompleted: number;
   mediumCompleted: number;
   hardCompleted: number;
   size6Completed: number;
   size8Completed: number;
   size10Completed: number;
-  perfectGames: number;
-  achievements: string[];
 }
 
 export const defaultStats: UserStats = {
   gamesPlayed: 0,
   gamesWon: 0,
+  perfectGames: 0,
+  achievements: [],
+  bestTime: null,
+  
   competitiveWins: 0,
   competitiveLosses: 0,
   competitiveStreak: 0,
   bestCompStreak: 0,
-  bestTime: null,
+
+  quickuroWins: 0,
+  quickuroLosses: 0,
+  quickuroBestTime: null,
+  quickuroBestStreak: 0,
+  quickuroCurrentStreak: 0,
+
+  
   easyCompleted: 0,
   mediumCompleted: 0,
   hardCompleted: 0,
   size6Completed: 0,
   size8Completed: 0,
   size10Completed: 0,
-  perfectGames: 0,
-  achievements: [],
+  
 };
 
 export interface GameResult {
@@ -53,7 +71,7 @@ export interface GameResult {
   time: number;
   difficulty: 'easy' | 'medium' | 'hard';
   gridSize: number;
-  isCompetitive: boolean;
+  gameMode: 'normal' | 'competitive' | 'quickuro';
   isPerfect: boolean;
 }
 
@@ -71,6 +89,8 @@ const ACHIEVEMENTS = [
   { id: 'perfectionist', check: (s: UserStats) => s.perfectGames >= 1 },
   { id: 'marathon', check: (s: UserStats) => s.gamesPlayed >= 50 },
   { id: 'century', check: (s: UserStats) => s.gamesPlayed >= 100 },
+  { id: 'first_quickuro_win', check: (s: UserStats) => s.quickuroWins >= 1 },
+  { id: 'quickuro_streak_5', check: (s: UserStats) => s.quickuroBestStreak >= 5 },
 ];
 
 function checkAchievements(stats: UserStats, result?: GameResult): string[] {
@@ -148,53 +168,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateGameStats = useCallback(async (result: GameResult): Promise<string[]> => {
-    const newStats = { ...userStats };
-    newStats.gamesPlayed += 1;
+  const newStats = { ...userStats };
+  newStats.gamesPlayed += 1;
 
-    if (result.won) {
-      newStats.gamesWon += 1;
-      if (result.difficulty === 'easy') newStats.easyCompleted += 1;
-      if (result.difficulty === 'medium') newStats.mediumCompleted += 1;
-      if (result.difficulty === 'hard') newStats.hardCompleted += 1;
-      if (result.gridSize === 6) newStats.size6Completed += 1;
-      if (result.gridSize === 8) newStats.size8Completed += 1;
-      if (result.gridSize === 10) newStats.size10Completed += 1;
+  if (result.won) {
+    newStats.gamesWon += 1;
 
-      if (result.isCompetitive) {
-        newStats.competitiveWins += 1;
-        newStats.competitiveStreak += 1;
-        if (newStats.competitiveStreak > newStats.bestCompStreak) {
-          newStats.bestCompStreak = newStats.competitiveStreak;
-        }
+    if (result.difficulty === 'easy') newStats.easyCompleted += 1;
+    if (result.difficulty === 'medium') newStats.mediumCompleted += 1;
+    if (result.difficulty === 'hard') newStats.hardCompleted += 1;
+
+    if (result.gridSize === 6) newStats.size6Completed += 1;
+    if (result.gridSize === 8) newStats.size8Completed += 1;
+    if (result.gridSize === 10) newStats.size10Completed += 1;
+
+    if (result.gameMode === 'competitive') {
+      newStats.competitiveWins += 1;
+      newStats.competitiveStreak += 1;
+
+      if (newStats.competitiveStreak > newStats.bestCompStreak) {
+        newStats.bestCompStreak = newStats.competitiveStreak;
+      }
+    } else if (result.gameMode === 'quickuro') {
+      newStats.quickuroWins += 1;
+      newStats.quickuroCurrentStreak += 1;
+
+      if (newStats.quickuroCurrentStreak > newStats.quickuroBestStreak) {
+        newStats.quickuroBestStreak = newStats.quickuroCurrentStreak;
       }
 
-      if (newStats.bestTime === null || result.time < newStats.bestTime) {
-        newStats.bestTime = result.time;
+      if (
+        newStats.quickuroBestTime === null ||
+        result.time < newStats.quickuroBestTime
+      ) {
+        newStats.quickuroBestTime = result.time;
       }
-      if (result.isPerfect) {
-        newStats.perfectGames += 1;
-      }
-    } else if (result.isCompetitive) {
+    }
+
+    if (newStats.bestTime === null || result.time < newStats.bestTime) {
+      newStats.bestTime = result.time;
+    }
+
+    if (result.isPerfect) {
+      newStats.perfectGames += 1;
+    }
+  } else {
+    if (result.gameMode === 'competitive') {
       newStats.competitiveLosses += 1;
       newStats.competitiveStreak = 0;
+    } else if (result.gameMode === 'quickuro') {
+      newStats.quickuroLosses += 1;
+      newStats.quickuroCurrentStreak = 0;
     }
+  }
 
-    const oldAchievements = [...newStats.achievements];
-    newStats.achievements = checkAchievements(newStats, result);
-    const newlyEarned = newStats.achievements.filter(a => !oldAchievements.includes(a));
+  const oldAchievements = [...newStats.achievements];
+  newStats.achievements = checkAchievements(newStats, result);
+  const newlyEarned = newStats.achievements.filter(a => !oldAchievements.includes(a));
 
-    setUserStats(newStats);
+  setUserStats(newStats);
 
-    if (user) {
-      try {
-        await setDoc(doc(db, 'userStats', user.uid), newStats);
-      } catch (err) {
-        console.warn('Could not save stats:', err);
-      }
+  if (user) {
+    try {
+      await setDoc(doc(db, 'userStats', user.uid), newStats);
+    } catch (err) {
+      console.warn('Could not save stats:', err);
     }
+  }
 
-    return newlyEarned;
-  }, [user, userStats]);
+  return newlyEarned;
+}, [user, userStats]);
 
   const refreshProfile = async () => {
     if (user) {

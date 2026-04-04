@@ -441,7 +441,7 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
         time: timeTaken,
         difficulty: currentMatch.difficulty,
         gridSize: currentMatch.gridSize,
-        isCompetitive: true,
+        gameMode: 'competitive',
         isPerfect: !hasUsedCheckRef.current,
       });
     } catch (error) {
@@ -484,7 +484,7 @@ export default function CompetitiveMode({ onBack }: { onBack: () => void }) {
         time: 0,
         difficulty: currentMatch.difficulty,
         gridSize: currentMatch.gridSize,
-        isCompetitive: true,
+        gameMode: 'competitive',
         isPerfect: false,
       });
     } catch (error) {

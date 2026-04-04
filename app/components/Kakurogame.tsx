@@ -287,7 +287,7 @@ export default function KakuroGame({
   };
 
   const handleCellClick = (row: number, col: number) => {
-    if (!puzzle || cheatingDetected || timeUp) return;
+    if (!puzzle || cheatingDetected || timeUp || isComplete) return;
     const cell = puzzle.grid[row][col];
     if (cell.type === 'playable') {
       setSelectedCell({ row, col });
@@ -295,7 +295,7 @@ export default function KakuroGame({
   };
 
   const handleNumberInput = useCallback((num: number) => {
-    if (!puzzle || !selectedCell || cheatingDetected || timeUp) return;
+    if (!puzzle || !selectedCell || cheatingDetected || timeUp || isComplete) return;
 
     const { row, col } = selectedCell;
     const cell = puzzle.grid[row][col];
@@ -327,7 +327,7 @@ export default function KakuroGame({
             time: timer,
             difficulty,
             gridSize,
-            isCompetitive: false,
+            gameMode: 'quickuro',
             isPerfect: !hasUsedCheck.current,
           }).then((newAchievements) => {
             if (newAchievements && newAchievements.length > 0) {
@@ -345,7 +345,7 @@ export default function KakuroGame({
             time: timer,
             difficulty,
             gridSize,
-            isCompetitive: false,
+            gameMode: 'normal',
             isPerfect: !hasUsedCheck.current,
           }).then((newAchievements) => {
             if (newAchievements && newAchievements.length > 0) {
@@ -400,14 +400,16 @@ export default function KakuroGame({
     const rowGroup = getRowGroup(puzzle.grid, selectedCell.row, selectedCell.col);
     const colGroup = getColGroup(puzzle.grid, selectedCell.row, selectedCell.col);
 
-    const isInGroup = rowGroup.some(c => c.row === cell.row && c.col === cell.col) ||
+    const isInGroup =
+      rowGroup.some(c => c.row === cell.row && c.col === cell.col) ||
       colGroup.some(c => c.row === cell.row && c.col === cell.col);
 
     if (cell.row === selectedCell.row && cell.col === selectedCell.col) {
-      return 'ring-2 ring-blue-500 bg-blue-100 dark:bg-blue-900/30';
+      return 'ring-2 ring-primary bg-primary/20';
     } else if (isInGroup) {
-      return 'bg-blue-50 dark:bg-blue-900/10';
+      return 'bg-accent';
     }
+
     return '';
   };
 
@@ -516,44 +518,75 @@ export default function KakuroGame({
 
       {/* Time Up Modal (Competitive) */}
       {timeUp && (
-        <div className="rounded-lg border-2 border-red-500 bg-red-50 p-6 text-center dark:bg-red-900/20">
-          <h2 className="text-3xl font-bold text-red-900 dark:text-red-100">
-            Time&apos;s Up!
-          </h2>
-          <p className="mt-2 text-red-700 dark:text-red-300">
-            You ran out of time. Better luck next time!
-          </p>
-          <button
-            onClick={() => startNewGame(gridSize, difficulty)}
-            className="mt-4 rounded-lg bg-red-600 px-6 py-2 font-semibold text-white hover:bg-red-700"
-          >
-            Try Again
-          </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-2xl border-2 border-red-500 bg-background p-8 text-center shadow-2xl">
+            <h2 className="text-3xl font-bold text-red-600 dark:text-red-400">
+              Time&apos;s Up!
+            </h2>
+            <p className="mt-3 text-base text-foreground">
+              You ran out of time. Better luck next time!
+            </p>
+
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                onClick={() => startNewGame(gridSize, difficulty)}
+                className="rounded-lg bg-red-600 px-6 py-2 font-semibold text-white hover:bg-red-700"
+              >
+                Try Again
+              </button>
+
+              <button
+                onClick={() => {
+                  clearGameState();
+                  onBack();
+                }}
+                className="rounded-lg border-2 border-border bg-card px-6 py-2 font-semibold text-foreground hover:bg-muted"
+              >
+                Back
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Game Complete Modal */}
       {isComplete && (
-        <div className="rounded-lg border-2 border-green-500 bg-green-50 p-6 text-center dark:bg-green-900/20">
-          <h2 className="text-3xl font-bold text-green-900 dark:text-green-100">
-            Congratulations!
-          </h2>
-          <p className="mt-2 text-green-700 dark:text-green-300">
-            {mode === 'competitive' || mode === 'quickuro'
-              ? `You completed the ${difficulty} puzzle with ${formatTime(timer)} remaining!`
-              : `You completed the puzzle in ${formatTime(timer)}!`}
-          </p>
-          <button
-            onClick={() => startNewGame(gridSize, difficulty)}
-            className="mt-4 rounded-lg bg-green-600 px-6 py-2 font-semibold text-white hover:bg-green-700"
-          >
-            New Game
-          </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-2xl border-2 border-green-500 bg-background p-8 text-center shadow-2xl">
+            <h2 className="text-3xl font-bold text-green-600 dark:text-green-400">
+              Congratulations!
+            </h2>
+            <p className="mt-3 text-base text-foreground">
+              {mode === 'competitive' || mode === 'quickuro'
+                ? `You completed the ${difficulty} puzzle with ${formatTime(timer)} remaining!`
+                : `You completed the puzzle in ${formatTime(timer)}!`}
+            </p>
+
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                onClick={() => startNewGame(gridSize, difficulty)}
+                className="rounded-lg bg-green-600 px-6 py-2 font-semibold text-white hover:bg-green-700"
+              >
+                New Game
+              </button>
+
+              <button
+                onClick={() => {
+                  clearGameState();
+                  onBack();
+                }}
+                className="rounded-lg border-2 border-border bg-card px-6 py-2 font-semibold text-foreground hover:bg-muted"
+              >
+                Back
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Game Board */}
-      <div className="overflow-x-auto rounded-lg border border-border bg-card p-4">
+      <div className={`overflow-x-auto rounded-lg border border-border bg-card p-4 ${isComplete || timeUp ? 'pointer-events-none opacity-80' : ''
+        }`}>
         <div className="inline-block min-w-full">
           <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${puzzle.size}, minmax(0, 1fr))` }}>
             {puzzle.grid.map((row, rowIndex) =>
@@ -562,16 +595,20 @@ export default function KakuroGame({
                   key={`${rowIndex}-${colIndex}`}
                   onClick={() => handleCellClick(rowIndex, colIndex)}
                   className={`
-                    relative aspect-square border border-zinc-400 dark:border-zinc-600
-                    ${cell.type === 'empty' ? 'bg-zinc-800 dark:bg-zinc-950' : ''}
-                    ${cell.type === 'clue' ? 'bg-zinc-800 dark:bg-zinc-950' : ''}
-                    ${cell.type === 'playable' ? 'bg-white dark:bg-zinc-800 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700' : ''}
-                    ${cell.isFixed ? 'bg-zinc-100 dark:bg-zinc-700' : ''}
-                    ${getCellHighlight(cell)}
-                    ${isCellError(cell) ? 'bg-red-100 dark:bg-red-900/30' : ''}
-                    ${isCellCorrect(cell) ? 'bg-green-100 dark:bg-green-900/30' : ''}
-                    ${showingSolution && cell.type === 'playable' ? 'bg-blue-100 dark:bg-blue-900/30' : ''}
-                  `}
+                    relative aspect-square border border-border
+                      ${cell.type === 'empty' ? 'bg-muted' : ''}
+                      ${cell.type === 'clue' ? 'bg-muted' : ''}
+                      ${cell.type === 'playable'
+                      ? 'bg-background cursor-pointer hover:bg-accent'
+                      : ''}
+                      ${cell.isFixed ? 'bg-secondary' : ''}
+                      ${getCellHighlight(cell)}
+                      ${isCellError(cell) ? 'bg-destructive/20' : ''}
+                      ${isCellCorrect(cell) ? 'bg-green-500/20' : ''}
+                      ${showingSolution && cell.type === 'playable'
+                      ? 'bg-primary/20'
+                      : ''}
+                    `}
                   style={{ minWidth: '48px', minHeight: '48px' }}
                 >
                   {cell.type === 'clue' && (
@@ -629,7 +666,7 @@ export default function KakuroGame({
           <button
             key={num}
             onClick={() => handleNumberInput(num)}
-            disabled={!selectedCell || cheatingDetected || timeUp}
+            disabled={!selectedCell || cheatingDetected || timeUp || isComplete}
             className="aspect-square rounded-lg border-3 border-border bg-card text-2l font-bold h-30 text-foreground transition-colors hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {num}
@@ -638,7 +675,7 @@ export default function KakuroGame({
 
         <button
           onClick={() => handleNumberInput(0)}
-          disabled={!selectedCell || cheatingDetected || timeUp}
+          disabled={!selectedCell || cheatingDetected || timeUp || isComplete}
           className="aspect-square rounded-lg border-2 border-border bg-card text-lg font-bold h-30 text-foreground transition-colors hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
         >
           Clear
@@ -667,7 +704,7 @@ export default function KakuroGame({
           )}
           {mode === 'normal' && (
             <>
-            <button
+              <button
                 onClick={handleReveal}
                 disabled={showingSolution}
                 className="rounded-lg border-2 border-orange-500 bg-orange-500 px-6 py-2 font-semibold text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
