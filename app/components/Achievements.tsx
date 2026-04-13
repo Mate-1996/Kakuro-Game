@@ -23,6 +23,8 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
   { id: 'perfectionist', name: 'Perfectionist', description: 'Complete a puzzle without using Check', icon: '✨' },
   { id: 'marathon', name: 'Marathon Runner', description: 'Play 50 games', icon: '🏃' },
   { id: 'century', name: 'Century', description: 'Play 100 games', icon: '💯' },
+  { id: 'first_quickuro_win', name: 'Need for Speed', description: 'Win your first game of Quickuro', icon: '🏁' },
+  { id: 'quickuro_streak_5', name: 'Charles Leclerc', description: 'Win 5 quickuro games in a row', icon: '🏎️' },
 ];
 
 function getProgress(id: string, stats: UserStats): { current: number; target: number } {

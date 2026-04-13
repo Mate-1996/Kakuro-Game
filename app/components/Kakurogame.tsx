@@ -15,9 +15,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
-interface KakuroGameProps {
+export interface KakuroGameProps {
   onBack: () => void;
-  mode?: 'normal' | 'competitive';
+  mode?: 'normal' | 'competitive' | 'quickuro';
   initialPuzzle?: KakuroGrid;
   matchTimeLimit?: number;
   onCompetitiveComplete?: (timeRemaining: number) => void;
@@ -38,21 +38,21 @@ function saveGameState(state: {
 }) {
   try {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(state));
-  } catch {}
+  } catch { }
 }
 
 function loadGameState() {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch { }
   return null;
 }
 
 function clearGameState() {
   try {
     sessionStorage.removeItem(CACHE_KEY);
-  } catch {}
+  } catch { }
 }
 
 export default function KakuroGame({
@@ -107,11 +107,11 @@ export default function KakuroGame({
   // Anti-cheat: detect tab/window switching
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.hidden && isRunning && mode === 'competitive') {
+      if (document.hidden && isRunning && (mode === 'competitive' || mode === 'quickuro')) {
         tabSwitchCount.current++;
         if (tabSwitchCount.current >= 3) {
           setCheatingDetected(true);
-          toast.error('Multiple tab switches detected during competitive mode!');
+          toast.error('Multiple tab switches detected during timed/competitive mode!');
         } else {
           toast.warning(`Tab switch detected (${tabSwitchCount.current}/3 allowed)`);
         }
@@ -139,7 +139,7 @@ export default function KakuroGame({
     if (isRunning && !isComplete && !timeUp) {
       interval = setInterval(() => {
         setTimer((prev) => {
-          if (mode === 'competitive') {
+          if (mode === 'competitive' || mode === 'quickuro') {
             const newVal = prev - 1;
             if (newVal <= 0) {
               setTimeUp(true);
@@ -184,7 +184,7 @@ export default function KakuroGame({
     moveTimestamps.current = [];
     tabSwitchCount.current = 0;
 
-    if (mode === 'competitive') {
+    if (mode === 'competitive' || mode === 'quickuro') {
       setTimer(matchTimeLimit || getTimeLimitForDifficulty(diff, size));
     } else {
       setTimer(0);
@@ -226,15 +226,15 @@ export default function KakuroGame({
   // Check puzzle for errors
   const handleCheck = () => {
     if (!puzzle) return;
-    
+
     setShowingErrors(true);
     setShowingSolution(false);
     hasUsedCheck.current = true;
     if (onCheckUsed) onCheckUsed();
-    
+
     let correct = 0;
     let incorrect = 0;
-    
+
     for (const row of puzzle.grid) {
       for (const cell of row) {
         if (cell.type === 'playable' && !cell.isFixed && cell.value !== undefined) {
@@ -246,10 +246,10 @@ export default function KakuroGame({
         }
       }
     }
-    
+
     const newGrid = puzzle.grid.map((r) => r.map((c) => ({ ...c })));
     setPuzzle({ ...puzzle, grid: newGrid });
-    
+
     setTimeout(() => {
       if (incorrect === 0 && correct > 0) {
         toast.success(`All ${correct} filled cells are correct!`);
@@ -264,12 +264,12 @@ export default function KakuroGame({
   // Reveal solution
   const handleReveal = () => {
     if (!puzzle) return;
-    
+
     const confirmed = confirm('Are you sure you want to reveal the solution? This will end the current game.');
     if (!confirmed) return;
-    
+
     const newGrid = puzzle.grid.map((r) => r.map((c) => ({ ...c })));
-    
+
     for (let row = 0; row < puzzle.size; row++) {
       for (let col = 0; col < puzzle.size; col++) {
         const cell = newGrid[row][col];
@@ -278,7 +278,7 @@ export default function KakuroGame({
         }
       }
     }
-    
+
     setPuzzle({ ...puzzle, grid: newGrid });
     setShowingSolution(true);
     setShowingErrors(false);
@@ -287,7 +287,7 @@ export default function KakuroGame({
   };
 
   const handleCellClick = (row: number, col: number) => {
-    if (!puzzle || cheatingDetected || timeUp) return;
+    if (!puzzle || cheatingDetected || timeUp || isComplete) return;
     const cell = puzzle.grid[row][col];
     if (cell.type === 'playable') {
       setSelectedCell({ row, col });
@@ -295,23 +295,23 @@ export default function KakuroGame({
   };
 
   const handleNumberInput = useCallback((num: number) => {
-    if (!puzzle || !selectedCell || cheatingDetected || timeUp) return;
-    
+    if (!puzzle || !selectedCell || cheatingDetected || timeUp || isComplete) return;
+
     const { row, col } = selectedCell;
     const cell = puzzle.grid[row][col];
-    
+
     if (cell.type !== 'playable' || cell.isFixed) return;
 
     // Anti-cheat check
-    if (mode === 'competitive' && checkRapidSolving()) return;
+    if ((mode === 'competitive' || mode === 'quickuro') && checkRapidSolving()) return;
 
     if (num === 0 || isValidMove(puzzle.grid, row, col, num)) {
       const newGrid = puzzle.grid.map((r) => r.map((c) => ({ ...c })));
-      
+
       newGrid[row][col].value = num === 0 ? undefined : num;
-      
+
       setPuzzle({ ...puzzle, grid: newGrid });
-      
+
       if (isPuzzleComplete(newGrid)) {
         setIsComplete(true);
         setIsRunning(false);
@@ -321,6 +321,23 @@ export default function KakuroGame({
             onCompetitiveComplete(timer);
           }
           toast.success(`Puzzle solved with ${formatTime(timer)} remaining!`);
+        } else if (mode === 'quickuro') {
+          updateGameStats({
+            won: true,
+            time: timer,
+            difficulty,
+            gridSize,
+            gameMode: 'quickuro',
+            isPerfect: !hasUsedCheck.current,
+          }).then((newAchievements) => {
+            if (newAchievements && newAchievements.length > 0) {
+              newAchievements.forEach(a => {
+                toast.success(`Achievement unlocked: ${a}!`, { duration: 5000 });
+              });
+            }
+          });
+
+          toast.success(`Puzzle solved with ${formatTime(timer)} remaining!`);
         } else {
           // Update stats for normal mode
           updateGameStats({
@@ -328,7 +345,7 @@ export default function KakuroGame({
             time: timer,
             difficulty,
             gridSize,
-            isCompetitive: false,
+            gameMode: 'normal',
             isPerfect: !hasUsedCheck.current,
           }).then((newAchievements) => {
             if (newAchievements && newAchievements.length > 0) {
@@ -346,7 +363,7 @@ export default function KakuroGame({
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (!selectedCell) return;
-      
+
       const num = parseInt(e.key);
       if (num >= 1 && num <= 9) {
         handleNumberInput(num);
@@ -379,18 +396,20 @@ export default function KakuroGame({
 
   const getCellHighlight = (cell: Cell) => {
     if (!selectedCell || !puzzle) return '';
-    
+
     const rowGroup = getRowGroup(puzzle.grid, selectedCell.row, selectedCell.col);
     const colGroup = getColGroup(puzzle.grid, selectedCell.row, selectedCell.col);
-    
-    const isInGroup = rowGroup.some(c => c.row === cell.row && c.col === cell.col) ||
-                      colGroup.some(c => c.row === cell.row && c.col === cell.col);
-    
+
+    const isInGroup =
+      rowGroup.some(c => c.row === cell.row && c.col === cell.col) ||
+      colGroup.some(c => c.row === cell.row && c.col === cell.col);
+
     if (cell.row === selectedCell.row && cell.col === selectedCell.col) {
-      return 'ring-2 ring-blue-500 bg-blue-100 dark:bg-blue-900/30';
+      return 'ring-2 ring-primary bg-primary/20';
     } else if (isInGroup) {
-      return 'bg-blue-50 dark:bg-blue-900/10';
+      return 'bg-accent';
     }
+
     return '';
   };
 
@@ -418,8 +437,13 @@ export default function KakuroGame({
               COMPETITIVE
             </span>
           )}
+          {mode === 'quickuro' && (
+            <span className="rounded-md bg-violet-100 px-2 py-1 text-sm font-semibold text-violet-800 dark:bg-violet-900/30 dark:text-violet-300">
+              Quickuro
+            </span>
+          )}
         </div>
-        
+
         <div className="flex items-center gap-4">
           {/* Grid size + difficulty selectors (independent) */}
           {!hideControls && !initialPuzzle && (
@@ -453,15 +477,22 @@ export default function KakuroGame({
             </div>
           )}
           {/* Show match info for competitive with initial puzzle */}
-          {initialPuzzle && (
-            <div className="flex items-center gap-2 rounded-lg border-2 border-orange-500/50 bg-orange-50 px-3 py-2 dark:bg-orange-900/10">
-              <span className="text-sm font-bold capitalize text-foreground">{difficulty}</span>
-              <span className="text-sm text-muted-foreground">{gridSize}×{gridSize}</span>
+          {initialPuzzle && (mode === 'competitive' || mode === 'quickuro') && (
+            <div className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 ${mode === 'competitive'
+              ? 'border-orange-500/50 bg-orange-50 dark:bg-orange-900/10'
+              : 'border-violet-700 dark:bg-violet-700/20'
+              }`}
+            >
+              <span className="text-sm font-bold capitalize text-foreground">
+                {difficulty}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {gridSize}×{gridSize}
+              </span>
             </div>
           )}
-          <div className={`text-3xl font-bold ${
-            mode === 'competitive' && timer <= 30 ? 'text-red-500 animate-pulse' : 'text-foreground'
-          }`}>
+          <div className={`text-3xl font-bold ${mode === 'competitive' || mode === 'quickuro' && timer <= 30 ? 'text-red-500 animate-pulse' : 'text-foreground'
+            }`}>
             {formatTime(timer)}
           </div>
         </div>
@@ -487,44 +518,75 @@ export default function KakuroGame({
 
       {/* Time Up Modal (Competitive) */}
       {timeUp && (
-        <div className="rounded-lg border-2 border-red-500 bg-red-50 p-6 text-center dark:bg-red-900/20">
-          <h2 className="text-3xl font-bold text-red-900 dark:text-red-100">
-            Time&apos;s Up!
-          </h2>
-          <p className="mt-2 text-red-700 dark:text-red-300">
-            You ran out of time. Better luck next time!
-          </p>
-          <button
-            onClick={() => startNewGame(gridSize, difficulty)}
-            className="mt-4 rounded-lg bg-red-600 px-6 py-2 font-semibold text-white hover:bg-red-700"
-          >
-            Try Again
-          </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-2xl border-2 border-red-500 bg-background p-8 text-center shadow-2xl">
+            <h2 className="text-3xl font-bold text-red-600 dark:text-red-400">
+              Time&apos;s Up!
+            </h2>
+            <p className="mt-3 text-base text-foreground">
+              You ran out of time. Better luck next time!
+            </p>
+
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                onClick={() => startNewGame(gridSize, difficulty)}
+                className="rounded-lg bg-red-600 px-6 py-2 font-semibold text-white hover:bg-red-700"
+              >
+                Try Again
+              </button>
+
+              <button
+                onClick={() => {
+                  clearGameState();
+                  onBack();
+                }}
+                className="rounded-lg border-2 border-border bg-card px-6 py-2 font-semibold text-foreground hover:bg-muted"
+              >
+                Back
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Game Complete Modal */}
       {isComplete && (
-        <div className="rounded-lg border-2 border-green-500 bg-green-50 p-6 text-center dark:bg-green-900/20">
-          <h2 className="text-3xl font-bold text-green-900 dark:text-green-100">
-            Congratulations!
-          </h2>
-          <p className="mt-2 text-green-700 dark:text-green-300">
-            {mode === 'competitive'
-              ? `You completed the ${difficulty} puzzle with ${formatTime(timer)} remaining!`
-              : `You completed the puzzle in ${formatTime(timer)}!`}
-          </p>
-          <button
-            onClick={() => startNewGame(gridSize, difficulty)}
-            className="mt-4 rounded-lg bg-green-600 px-6 py-2 font-semibold text-white hover:bg-green-700"
-          >
-            New Game
-          </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-2xl border-2 border-green-500 bg-background p-8 text-center shadow-2xl">
+            <h2 className="text-3xl font-bold text-green-600 dark:text-green-400">
+              Congratulations!
+            </h2>
+            <p className="mt-3 text-base text-foreground">
+              {mode === 'competitive' || mode === 'quickuro'
+                ? `You completed the ${difficulty} puzzle with ${formatTime(timer)} remaining!`
+                : `You completed the puzzle in ${formatTime(timer)}!`}
+            </p>
+
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                onClick={() => startNewGame(gridSize, difficulty)}
+                className="rounded-lg bg-green-600 px-6 py-2 font-semibold text-white hover:bg-green-700"
+              >
+                New Game
+              </button>
+
+              <button
+                onClick={() => {
+                  clearGameState();
+                  onBack();
+                }}
+                className="rounded-lg border-2 border-border bg-card px-6 py-2 font-semibold text-foreground hover:bg-muted"
+              >
+                Back
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Game Board */}
-      <div className="overflow-x-auto rounded-lg border border-border bg-card p-4">
+      <div className={`overflow-x-auto rounded-lg border border-border bg-card p-4 ${isComplete || timeUp ? 'pointer-events-none opacity-80' : ''
+        }`}>
         <div className="inline-block min-w-full">
           <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${puzzle.size}, minmax(0, 1fr))` }}>
             {puzzle.grid.map((row, rowIndex) =>
@@ -533,16 +595,20 @@ export default function KakuroGame({
                   key={`${rowIndex}-${colIndex}`}
                   onClick={() => handleCellClick(rowIndex, colIndex)}
                   className={`
-                    relative aspect-square border border-zinc-400 dark:border-zinc-600
-                    ${cell.type === 'empty' ? 'bg-zinc-800 dark:bg-zinc-950' : ''}
-                    ${cell.type === 'clue' ? 'bg-zinc-800 dark:bg-zinc-950' : ''}
-                    ${cell.type === 'playable' ? 'bg-white dark:bg-zinc-800 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700' : ''}
-                    ${cell.isFixed ? 'bg-zinc-100 dark:bg-zinc-700' : ''}
-                    ${getCellHighlight(cell)}
-                    ${isCellError(cell) ? 'bg-red-100 dark:bg-red-900/30' : ''}
-                    ${isCellCorrect(cell) ? 'bg-green-100 dark:bg-green-900/30' : ''}
-                    ${showingSolution && cell.type === 'playable' ? 'bg-blue-100 dark:bg-blue-900/30' : ''}
-                  `}
+                    relative aspect-square border border-border
+                      ${cell.type === 'empty' ? 'bg-muted' : ''}
+                      ${cell.type === 'clue' ? 'bg-muted' : ''}
+                      ${cell.type === 'playable'
+                      ? 'bg-background cursor-pointer hover:bg-accent'
+                      : ''}
+                      ${cell.isFixed ? 'bg-secondary' : ''}
+                      ${getCellHighlight(cell)}
+                      ${isCellError(cell) ? 'bg-destructive/20' : ''}
+                      ${isCellCorrect(cell) ? 'bg-green-500/20' : ''}
+                      ${showingSolution && cell.type === 'playable'
+                      ? 'bg-primary/20'
+                      : ''}
+                    `}
                   style={{ minWidth: '48px', minHeight: '48px' }}
                 >
                   {cell.type === 'clue' && (
@@ -553,9 +619,9 @@ export default function KakuroGame({
                         </svg>
                       </div>
                       {cell.clueDown && (
-                        <div 
-                          className="absolute font-bold text-red-400 dark:text-red-300" 
-                          style={{ 
+                        <div
+                          className="absolute font-bold text-red-400 dark:text-red-300"
+                          style={{
                             fontSize: puzzle.size <= 6 ? '1.5rem' : puzzle.size <= 8 ? '1.2rem' : puzzle.size <= 10 ? '1rem' : '0.9rem',
                             left: '20%',
                             top: '50%',
@@ -566,9 +632,9 @@ export default function KakuroGame({
                         </div>
                       )}
                       {cell.clueAcross && (
-                        <div 
-                          className="absolute font-bold text-blue-400 dark:text-blue-300" 
-                          style={{ 
+                        <div
+                          className="absolute font-bold text-blue-400 dark:text-blue-300"
+                          style={{
                             fontSize: puzzle.size <= 6 ? '1.5rem' : puzzle.size <= 8 ? '1.2rem' : puzzle.size <= 10 ? '1rem' : '0.9rem',
                             right: '20%',
                             bottom: '50%',
@@ -582,9 +648,8 @@ export default function KakuroGame({
                   )}
 
                   {cell.type === 'playable' && (
-                    <div className={`flex h-full w-full items-center justify-center text-2xl font-bold ${
-                      cell.isFixed ? 'text-zinc-500 dark:text-zinc-400' : 'text-foreground'
-                    }`}>
+                    <div className={`flex h-full w-full items-center justify-center text-2xl font-bold ${cell.isFixed ? 'text-zinc-500 dark:text-zinc-400' : 'text-foreground'
+                      }`}>
                       {cell.value || ''}
                     </div>
                   )}
@@ -596,21 +661,22 @@ export default function KakuroGame({
       </div>
 
       {/* Number Pad */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-5 gap-3">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
           <button
             key={num}
             onClick={() => handleNumberInput(num)}
-            disabled={!selectedCell || cheatingDetected || timeUp}
-            className="aspect-square rounded-lg border-2 border-border bg-card text-2xl font-bold text-foreground transition-colors hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+            disabled={!selectedCell || cheatingDetected || timeUp || isComplete}
+            className="aspect-square rounded-lg border-3 border-border bg-card text-2l font-bold h-30 text-foreground transition-colors hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {num}
           </button>
         ))}
+
         <button
           onClick={() => handleNumberInput(0)}
-          disabled={!selectedCell || cheatingDetected || timeUp}
-          className="aspect-square rounded-lg border-2 border-border bg-card text-lg font-bold text-foreground transition-colors hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+          disabled={!selectedCell || cheatingDetected || timeUp || isComplete}
+          className="aspect-square rounded-lg border-2 border-border bg-card text-lg font-bold h-30 text-foreground transition-colors hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
         >
           Clear
         </button>
@@ -625,7 +691,7 @@ export default function KakuroGame({
           >
             New Grid
           </button>
-          {mode === 'normal' && (
+          {(mode === 'normal' || mode === 'quickuro') && (
             <>
               <button
                 onClick={handleCheck}
@@ -634,6 +700,10 @@ export default function KakuroGame({
               >
                 Check
               </button>
+            </>
+          )}
+          {mode === 'normal' && (
+            <>
               <button
                 onClick={handleReveal}
                 disabled={showingSolution}

@@ -6,19 +6,22 @@ import { auth } from '@/lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import KakuroGame from './Kakurogame';
 import CompetitiveMode from './CompetitiveMode';
+import Quickuro from './Quickuro';
 import FriendsList from './FriendsList';
 import Achievements from './Achievements';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
+import Leaderboard from './Leaderboard';
 
-type DashboardView = 'home' | 'normal' | 'competitive' | 'friends';
-type SidebarSection = 'stats' | 'achievements' | 'friends';
+type DashboardView = 'home' | 'normal' | 'competitive' | 'friends' | 'quickuro';
+type SidebarSection = 'stats' | 'leaderboard' | 'achievements' | 'friends';
 
 export default function Dashboard() {
   const { user, userProfile, userStats, isGuest, setIsGuest } = useAuth();
   const [view, setView] = useState<DashboardView>('home');
   const [expandedSections, setExpandedSections] = useState<Record<SidebarSection, boolean>>({
     stats: true,
+    leaderboard: true,
     achievements: true,
     friends: true,
   });
@@ -47,6 +50,10 @@ export default function Dashboard() {
     return <CompetitiveMode onBack={() => setView('home')} />;
   }
 
+  if (view === 'quickuro') {
+    return <Quickuro onBack={() => setView('home')} />;
+  }
+
   const displayName = isGuest
     ? 'Guest'
     : userProfile?.displayUsername || userProfile?.username || user?.displayName || user?.email;
@@ -61,7 +68,7 @@ export default function Dashboard() {
   return (
     <div className="flex w-full max-w-7xl gap-6">
       {/* LEFT SIDEBAR */}
-      <aside className="hidden w-72 shrink-0 space-y-4 lg:block">
+      <aside className="hidden w-72 shrink-0 space-y-4 self-start lg:block lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto pr-2">
         {/* Profile Card */}
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
@@ -83,13 +90,13 @@ export default function Dashboard() {
           >
             <div className="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                <path d="M3 3v18h18"/>
-                <path d="m19 9-5 5-4-4-3 3"/>
+                <path d="M3 3v18h18" />
+                <path d="m19 9-5 5-4-4-3 3" />
               </svg>
               <span className="text-sm font-semibold text-foreground">Stats</span>
             </div>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-muted-foreground transition-transform ${expandedSections.stats ? 'rotate-180' : ''}`}>
-              <path d="m6 9 6 6 6-6"/>
+              <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
           {expandedSections.stats && (
@@ -131,6 +138,39 @@ export default function Dashboard() {
           )}
         </div>
 
+        <div className="rounded-xl border border-border bg-card">
+          <button
+            onClick={() => toggleSection('leaderboard')}
+            className="flex w-full items-center justify-between p-4 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🥇</span>
+              <span className="text-sm font-semibold text-foreground">Leaderboard</span>
+            </div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`text-muted-foreground transition-transform ${expandedSections.leaderboard ? 'rotate-180' : ''
+                }`}
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {expandedSections.leaderboard && (
+            <div className="border-t border-border px-4 pb-4 pt-3">
+              <Leaderboard />
+            </div>
+          )}
+        </div>
+
         {/* Achievements Section */}
         <div className="rounded-xl border border-border bg-card">
           <button
@@ -142,7 +182,7 @@ export default function Dashboard() {
               <span className="text-sm font-semibold text-foreground">Achievements</span>
             </div>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-muted-foreground transition-transform ${expandedSections.achievements ? 'rotate-180' : ''}`}>
-              <path d="m6 9 6 6 6-6"/>
+              <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
           {expandedSections.achievements && (
@@ -161,15 +201,15 @@ export default function Dashboard() {
             >
               <div className="flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
                 <span className="text-sm font-semibold text-foreground">Friends</span>
               </div>
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-muted-foreground transition-transform ${expandedSections.friends ? 'rotate-180' : ''}`}>
-                <path d="m6 9 6 6 6-6"/>
+                <path d="m6 9 6 6 6-6" />
               </svg>
             </button>
             {expandedSections.friends && (
@@ -243,7 +283,7 @@ export default function Dashboard() {
           ) : (
             <button
               onClick={() => setView('competitive')}
-              className="group rounded-xl border-2 border-orange-500/50 bg-card p-8 text-left transition-all hover:border-orange-500 hover:shadow-lg hover:shadow-orange-500/10"
+              className="group rounded-xl border-2 border-orange-500/50 bg-card p-8 text-left transition-all hover:border-orange-500 hover:shadow-lg hover:shadow-orange-500"
             >
               <div className="flex items-center gap-4">
                 <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-orange-500/10 text-3xl transition-transform group-hover:scale-110">
@@ -259,6 +299,25 @@ export default function Dashboard() {
               </p>
             </button>
           )}
+
+          {/* Normal Mode Card */}
+          <button
+            onClick={() => setView('quickuro')}
+            className="group rounded-xl border-2 border-violet-800 bg-card p-8 text-left transition-all hover:border-violet-700 hover:shadow-xl hover:shadow-violet-600/50"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-3xl transition-transform group-hover:scale-110">
+                ⚡
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Quickuro™️</h3>
+                <p className="text-sm text-muted-foreground text-violet-500">Play against a set time.</p>
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Choose your own grid size, difficulty, and time. Race against time!
+            </p>
+          </button>
         </div>
 
         {/* Mobile-only sections (shown below on small screens) */}
