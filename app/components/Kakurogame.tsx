@@ -77,6 +77,7 @@ export default function KakuroGame({
   const [showingSolution, setShowingSolution] = useState(false);
   const [timeUp, setTimeUp] = useState(false);
   const hasUsedCheck = useRef(false);
+  const quickuroResultSavedRef = useRef(false);
 
   // Anti-cheat: track suspicious behaviour
   const moveTimestamps = useRef<number[]>([]);
@@ -144,7 +145,11 @@ export default function KakuroGame({
             if (newVal <= 0) {
               setTimeUp(true);
               setIsRunning(false);
-              if (onCompetitiveTimeUp) onCompetitiveTimeUp();
+
+              if (mode === 'competitive') {
+                if (onCompetitiveTimeUp) onCompetitiveTimeUp();
+              }
+
               return 0;
             }
             return newVal;
@@ -169,6 +174,28 @@ export default function KakuroGame({
       });
     }
   }, [puzzle, timer, gridSize, difficulty, mode, isComplete, isRunning]);
+
+  useEffect(() => {
+  if (
+    mode === 'quickuro' &&
+    timeUp &&
+    !isComplete &&
+    !hasUsedCheck.current
+  ) {
+    hasUsedCheck.current = true;
+
+    updateGameStats({
+      won: false,
+      time: 0,
+      difficulty,
+      gridSize,
+      gameMode: 'quickuro',
+      isPerfect: false,
+    }).catch((err) => {
+      console.warn('Could not save Quickuro loss:', err);
+    });
+  }
+}, [mode, timeUp, isComplete, difficulty, gridSize, updateGameStats]);
 
   // Start new game
   const startNewGame = useCallback((size: number = gridSize, diff: Difficulty = difficulty) => {
@@ -322,6 +349,8 @@ export default function KakuroGame({
           }
           toast.success(`Puzzle solved with ${formatTime(timer)} remaining!`);
         } else if (mode === 'quickuro') {
+          quickuroResultSavedRef.current = true
+          
           updateGameStats({
             won: true,
             time: timer,
@@ -331,12 +360,11 @@ export default function KakuroGame({
             isPerfect: !hasUsedCheck.current,
           }).then((newAchievements) => {
             if (newAchievements && newAchievements.length > 0) {
-              newAchievements.forEach(a => {
+              newAchievements.forEach((a) => {
                 toast.success(`Achievement unlocked: ${a}!`, { duration: 5000 });
               });
             }
           });
-
           toast.success(`Puzzle solved with ${formatTime(timer)} remaining!`);
         } else {
           // Update stats for normal mode
