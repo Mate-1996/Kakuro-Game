@@ -9,9 +9,9 @@ import CompetitiveMode from './CompetitiveMode';
 import Quickuro from './Quickuro';
 import FriendsList from './FriendsList';
 import Achievements from './Achievements';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import Leaderboard from './Leaderboard';
+import SettingsMenu from './SettingsMenu';
 
 type DashboardView = 'home' | 'normal' | 'competitive' | 'friends' | 'quickuro';
 type SidebarSection = 'stats' | 'leaderboard' | 'achievements' | 'friends';
@@ -230,7 +230,7 @@ export default function Dashboard() {
             <p className="mt-1 text-sm text-muted-foreground">Welcome back, {displayName}</p>
           </div>
           <div className="flex items-center gap-3">
-            <ThemeToggle />
+            <SettingsMenu />
             <button
               onClick={handleSignOut}
               className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted"

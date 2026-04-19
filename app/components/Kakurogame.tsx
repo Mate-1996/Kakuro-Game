@@ -76,8 +76,10 @@ export default function KakuroGame({
   const [showingErrors, setShowingErrors] = useState(false);
   const [showingSolution, setShowingSolution] = useState(false);
   const [timeUp, setTimeUp] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
   const hasUsedCheck = useRef(false);
   const quickuroResultSavedRef = useRef(false);
+
 
   // Anti-cheat: track suspicious behaviour
   const moveTimestamps = useRef<number[]>([]);
@@ -176,26 +178,26 @@ export default function KakuroGame({
   }, [puzzle, timer, gridSize, difficulty, mode, isComplete, isRunning]);
 
   useEffect(() => {
-  if (
-    mode === 'quickuro' &&
-    timeUp &&
-    !isComplete &&
-    !hasUsedCheck.current
-  ) {
-    hasUsedCheck.current = true;
+    if (
+      mode === 'quickuro' &&
+      timeUp &&
+      !isComplete &&
+      !hasUsedCheck.current
+    ) {
+      hasUsedCheck.current = true;
 
-    updateGameStats({
-      won: false,
-      time: 0,
-      difficulty,
-      gridSize,
-      gameMode: 'quickuro',
-      isPerfect: false,
-    }).catch((err) => {
-      console.warn('Could not save Quickuro loss:', err);
-    });
-  }
-}, [mode, timeUp, isComplete, difficulty, gridSize, updateGameStats]);
+      updateGameStats({
+        won: false,
+        time: 0,
+        difficulty,
+        gridSize,
+        gameMode: 'quickuro',
+        isPerfect: false,
+      }).catch((err) => {
+        console.warn('Could not save Quickuro loss:', err);
+      });
+    }
+  }, [mode, timeUp, isComplete, difficulty, gridSize, updateGameStats]);
 
   // Start new game
   const startNewGame = useCallback((size: number = gridSize, diff: Difficulty = difficulty) => {
@@ -206,6 +208,7 @@ export default function KakuroGame({
     setShowingErrors(false);
     setShowingSolution(false);
     setTimeUp(false);
+    setPendingSubmit(false);
     setCheatingDetected(false);
     hasUsedCheck.current = false;
     moveTimestamps.current = [];
@@ -313,6 +316,25 @@ export default function KakuroGame({
     clearGameState();
   };
 
+  const handleSubmit = useCallback(() => {
+    if (!pendingSubmit || mode !== 'quickuro') return;
+    setPendingSubmit(false);
+    setIsComplete(true);
+    setIsRunning(false);
+    clearGameState();
+    quickuroResultSavedRef.current = true;
+    updateGameStats({
+      won: true, time: timer, difficulty, gridSize,
+      gameMode: 'quickuro', isPerfect: !hasUsedCheck.current,
+    }).then((newAchievements) => {
+      if (newAchievements?.length > 0) {
+        newAchievements.forEach((a) =>
+          toast.success(`Achievement unlocked: ${a}!`, { duration: 5000 }));
+      }
+    });
+    toast.success(`Puzzle solved with ${formatTime(timer)} remaining!`);
+  }, [pendingSubmit, mode, timer, difficulty, gridSize, updateGameStats]);
+
   const handleCellClick = (row: number, col: number) => {
     if (!puzzle || cheatingDetected || timeUp || isComplete) return;
     const cell = puzzle.grid[row][col];
@@ -340,49 +362,35 @@ export default function KakuroGame({
       setPuzzle({ ...puzzle, grid: newGrid });
 
       if (isPuzzleComplete(newGrid)) {
-        setIsComplete(true);
-        setIsRunning(false);
-        clearGameState();
-        if (mode === 'competitive') {
-          if (onCompetitiveComplete) {
-            onCompetitiveComplete(timer);
-          }
-          toast.success(`Puzzle solved with ${formatTime(timer)} remaining!`);
-        } else if (mode === 'quickuro') {
-          quickuroResultSavedRef.current = true
-          
-          updateGameStats({
-            won: true,
-            time: timer,
-            difficulty,
-            gridSize,
-            gameMode: 'quickuro',
-            isPerfect: !hasUsedCheck.current,
-          }).then((newAchievements) => {
-            if (newAchievements && newAchievements.length > 0) {
-              newAchievements.forEach((a) => {
-                toast.success(`Achievement unlocked: ${a}!`, { duration: 5000 });
-              });
-            }
-          });
-          toast.success(`Puzzle solved with ${formatTime(timer)} remaining!`);
+        if (mode === 'quickuro') {
+          setPendingSubmit(true)
         } else {
-          // Update stats for normal mode
-          updateGameStats({
-            won: true,
-            time: timer,
-            difficulty,
-            gridSize,
-            gameMode: 'normal',
-            isPerfect: !hasUsedCheck.current,
-          }).then((newAchievements) => {
-            if (newAchievements && newAchievements.length > 0) {
-              newAchievements.forEach(a => {
-                toast.success(`Achievement unlocked: ${a}!`, { duration: 5000 });
-              });
+          setIsComplete(true);
+          setIsRunning(false);
+          clearGameState();
+          if (mode === 'competitive') {
+            if (onCompetitiveComplete) {
+              onCompetitiveComplete(timer);
             }
-          });
-          toast.success('Congratulations! Puzzle complete!');
+            toast.success(`Puzzle solved with ${formatTime(timer)} remaining!`);
+          } else {
+            // Update stats for normal mode
+            updateGameStats({
+              won: true,
+              time: timer,
+              difficulty,
+              gridSize,
+              gameMode: 'normal',
+              isPerfect: !hasUsedCheck.current,
+            }).then((newAchievements) => {
+              if (newAchievements && newAchievements.length > 0) {
+                newAchievements.forEach(a => {
+                  toast.success(`Achievement unlocked: ${a}!`, { duration: 5000 });
+                });
+              }
+            });
+            toast.success('Congratulations! Puzzle complete!');
+          }
         }
       }
     }
@@ -728,10 +736,7 @@ export default function KakuroGame({
               >
                 Check
               </button>
-            </>
-          )}
-          {mode === 'normal' && (
-            <>
+
               <button
                 onClick={handleReveal}
                 disabled={showingSolution}
@@ -739,7 +744,16 @@ export default function KakuroGame({
               >
                 Reveal
               </button>
+              
             </>
+          )}
+          {mode === 'quickuro' && (
+            <button 
+            onClick={handleSubmit}
+            disabled={!pendingSubmit}
+            className="rounded-lg border-2 border-green-500 bg-green-500 px-6 py-2 font-semibold text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed">
+              Submit
+            </button>
           )}
         </div>
       )}

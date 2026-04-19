@@ -24,7 +24,7 @@ export interface UserStats {
   competitiveStreak: number;
   bestCompStreak: number;
 
-  quickuroWins: number;
+  quickuroWins: number; 
   quickuroLosses: number;
   quickuroBestTime: number | null;
   quickuroBestStreak: number;

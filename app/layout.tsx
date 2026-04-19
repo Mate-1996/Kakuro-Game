@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { AudioProvider } from "./context/AudioContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,8 +33,10 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem={false} themes={["light", "dark", "purple", "blue", "redWhite", "green"]}>
           <AuthProvider>
-            {children}
-            <Toaster position="top-center" richColors />
+            <AudioProvider>
+              {children}
+              <Toaster position="top-center" richColors />
+            </AudioProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
